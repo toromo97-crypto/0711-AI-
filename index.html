@@ -248,6 +248,94 @@
     .tile{ padding:48px 20px; }
     .footer{ padding:48px 20px; }
   }
+
+  .saju-form{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:16px;
+    width:100%;
+    max-width:420px;
+  }
+  .field-row{
+    display:flex;
+    gap:16px;
+    flex-wrap:wrap;
+    justify-content:center;
+    width:100%;
+  }
+  .field{
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+    text-align:left;
+    flex:1;
+    min-width:160px;
+  }
+  .field-label{
+    font-family:"SF Pro Text",-apple-system,system-ui,sans-serif;
+    font-size:12px;
+    font-weight:600;
+    letter-spacing:-0.12px;
+    color:var(--ink-muted-80);
+  }
+  .field input{
+    appearance:none;
+    border:1px solid var(--hairline);
+    background:var(--canvas);
+    color:var(--ink);
+    font-family:"SF Pro Text",-apple-system,system-ui,sans-serif;
+    font-size:17px;
+    letter-spacing:-0.374px;
+    border-radius:9999px;
+    padding:12px 20px;
+    height:44px;
+  }
+  .field input:disabled{ color:var(--ink-muted-48); background:var(--canvas-parchment); }
+  .field input:focus-visible{ outline:2px solid var(--primary-focus); outline-offset:2px; }
+
+  .checkbox-row{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    font-family:"SF Pro Text",-apple-system,system-ui,sans-serif;
+    font-size:14px;
+    letter-spacing:-0.224px;
+    color:var(--ink-muted-80);
+  }
+  .checkbox-row input{ width:16px; height:16px; }
+
+  .saju-error{
+    font-family:"SF Pro Text",-apple-system,system-ui,sans-serif;
+    font-size:13px;
+    letter-spacing:-0.224px;
+    color:var(--ball-red);
+    min-height:18px;
+    margin:0;
+  }
+
+  .saju-result{
+    margin-top:40px;
+    background:var(--surface-tile-1);
+    color:var(--body-on-dark);
+    border-radius:18px;
+    padding:28px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:16px;
+    max-width:480px;
+    width:100%;
+  }
+  .saju-reason{
+    font-family:"SF Pro Text",-apple-system,system-ui,sans-serif;
+    font-size:14px;
+    line-height:1.5;
+    letter-spacing:-0.224px;
+    color:var(--body-muted);
+    margin:0;
+    text-align:center;
+  }
 </style>
 </head>
 <body>
@@ -268,6 +356,38 @@
   </div>
 
   <button class="btn-primary" id="drawBtn">번호 추첨하기</button>
+</section>
+
+<section class="tile tile-parchment">
+  <p class="eyebrow">AI SAJU</p>
+  <h2>사주로 번호 추천받기</h2>
+  <p class="lead">생년월일과 태어난 시간을 입력하면 사주 이미지를 참고해 AI가 번호 6개를 골라드려요. 오락용 콘텐츠로, 실제 명리학적 정확성을 보장하지 않습니다.</p>
+
+  <form class="saju-form" id="sajuForm">
+    <div class="field-row">
+      <label class="field">
+        <span class="field-label">생년월일</span>
+        <input type="date" id="birthDate" required>
+      </label>
+      <label class="field">
+        <span class="field-label">태어난 시간</span>
+        <input type="time" id="birthTime" disabled>
+      </label>
+    </div>
+
+    <label class="checkbox-row">
+      <input type="checkbox" id="timeUnknown" checked>
+      <span>태어난 시간 모름</span>
+    </label>
+
+    <button type="submit" class="btn-primary" id="sajuBtn">사주로 추천받기</button>
+    <p class="saju-error" id="sajuError" role="alert"></p>
+  </form>
+
+  <div class="saju-result" id="sajuResult" hidden>
+    <div class="tray" id="sajuTray"></div>
+    <p class="saju-reason" id="sajuReason"></p>
+  </div>
 </section>
 
 <section class="tile tile-dark">
@@ -354,6 +474,70 @@
     for(let i=0;i<count;i++) sets.push(drawOne());
     render(sets);
     setTimeout(()=>{ btn.disabled = false; }, 350);
+  });
+
+  const timeUnknown = document.getElementById('timeUnknown');
+  const birthTimeInput = document.getElementById('birthTime');
+  timeUnknown.addEventListener('change', function(){
+    birthTimeInput.disabled = timeUnknown.checked;
+    if(timeUnknown.checked) birthTimeInput.value = '';
+  });
+
+  const sajuForm = document.getElementById('sajuForm');
+  const sajuBtn = document.getElementById('sajuBtn');
+  const sajuError = document.getElementById('sajuError');
+  const sajuResult = document.getElementById('sajuResult');
+  const sajuTray = document.getElementById('sajuTray');
+  const sajuReason = document.getElementById('sajuReason');
+
+  function renderSajuBalls(nums){
+    sajuTray.innerHTML = '';
+    nums.forEach((n, i)=>{
+      const b = document.createElement('div');
+      b.className = 'ball ' + colorClass(n);
+      b.textContent = n;
+      b.style.setProperty('--delay', (i*0.04) + 's');
+      sajuTray.appendChild(b);
+    });
+  }
+
+  sajuForm.addEventListener('submit', async function(e){
+    e.preventDefault();
+    sajuError.textContent = '';
+
+    const birthDate = document.getElementById('birthDate').value;
+    const birthTime = timeUnknown.checked ? '' : birthTimeInput.value;
+
+    if(!birthDate){
+      sajuError.textContent = '생년월일을 입력해주세요.';
+      return;
+    }
+
+    sajuBtn.disabled = true;
+    sajuBtn.textContent = '사주를 분석하는 중...';
+
+    try{
+      const res = await fetch('/api/saju', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ birthDate, birthTime: birthTime || null })
+      });
+      const data = await res.json();
+
+      if(!res.ok){
+        sajuError.textContent = data.error || '번호를 추천받지 못했습니다. 잠시 후 다시 시도해주세요.';
+        return;
+      }
+
+      renderSajuBalls(data.numbers);
+      sajuReason.textContent = data.reason;
+      sajuResult.hidden = false;
+    }catch(err){
+      sajuError.textContent = '서버에 연결할 수 없습니다. 잠시 후 다시 시도해주세요.';
+    }finally{
+      sajuBtn.disabled = false;
+      sajuBtn.textContent = '사주로 추천받기';
+    }
   });
 })();
 </script>

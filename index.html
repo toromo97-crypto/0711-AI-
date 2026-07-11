@@ -1,0 +1,361 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>로또 번호 추첨기</title>
+<style>
+  :root{
+    --primary:#0066cc;
+    --primary-focus:#0071e3;
+    --primary-on-dark:#2997ff;
+    --ink:#1d1d1f;
+    --body-on-dark:#ffffff;
+    --body-muted:#cccccc;
+    --ink-muted-80:#333333;
+    --ink-muted-48:#7a7a7a;
+    --hairline:#e0e0e0;
+    --canvas:#ffffff;
+    --canvas-parchment:#f5f5f7;
+    --surface-tile-1:#272729;
+    --surface-tile-2:#2a2a2c;
+    --on-primary:#ffffff;
+    --product-shadow:0 5px 30px 3px rgba(0,0,0,0.22);
+
+    --ball-yellow:#f4c430;
+    --ball-blue:#0066cc;
+    --ball-red:#e2453b;
+    --ball-gray:#8b93a6;
+    --ball-green:#2f9e52;
+  }
+
+  *{box-sizing:border-box;}
+  html,body{margin:0;}
+  body{
+    font-family:"SF Pro Text",-apple-system,"Apple SD Gothic Neo",system-ui,"Malgun Gothic",sans-serif;
+    color:var(--ink);
+    background:var(--canvas);
+  }
+
+  .nav{
+    background:#000;
+    color:var(--body-on-dark);
+    height:44px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:12px;
+    letter-spacing:-0.12px;
+    font-weight:400;
+  }
+
+  .tile{
+    padding:80px 24px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    text-align:center;
+  }
+  .tile-light{ background:var(--canvas); color:var(--ink); }
+  .tile-parchment{ background:var(--canvas-parchment); color:var(--ink); }
+  .tile-dark{ background:var(--surface-tile-1); color:var(--body-on-dark); }
+
+  .eyebrow{
+    font-family:"SF Pro Text",-apple-system,system-ui,sans-serif;
+    font-size:14px;
+    font-weight:600;
+    letter-spacing:-0.224px;
+    color:var(--primary);
+    margin:0 0 12px;
+  }
+  .tile-dark .eyebrow{ color:var(--primary-on-dark); }
+
+  h1{
+    font-family:"SF Pro Display",-apple-system,"Apple SD Gothic Neo",system-ui,sans-serif;
+    font-size:clamp(28px,5vw,40px);
+    font-weight:600;
+    line-height:1.1;
+    letter-spacing:0;
+    margin:0 0 17px;
+    text-wrap:balance;
+  }
+
+  h2{
+    font-family:"SF Pro Display",-apple-system,"Apple SD Gothic Neo",system-ui,sans-serif;
+    font-size:clamp(24px,4vw,34px);
+    font-weight:600;
+    line-height:1.2;
+    letter-spacing:-0.374px;
+    margin:0 0 8px;
+  }
+
+  .lead{
+    font-family:"SF Pro Display",-apple-system,"Apple SD Gothic Neo",system-ui,sans-serif;
+    font-size:clamp(17px,2.4vw,21px);
+    font-weight:400;
+    line-height:1.4;
+    letter-spacing:0.196px;
+    color:var(--ink-muted-80);
+    margin:0 0 40px;
+    max-width:480px;
+  }
+  .tile-dark .lead{ color:var(--body-muted); }
+
+  .chip-group{
+    display:flex;
+    gap:12px;
+    flex-wrap:wrap;
+    justify-content:center;
+    margin-bottom:32px;
+  }
+  .chip{
+    appearance:none;
+    border:1px solid var(--hairline);
+    background:var(--canvas);
+    color:var(--ink);
+    font-family:"SF Pro Text",-apple-system,system-ui,sans-serif;
+    font-size:14px;
+    font-weight:400;
+    letter-spacing:-0.224px;
+    line-height:1.29;
+    border-radius:9999px;
+    padding:12px 20px;
+    cursor:pointer;
+    transition:border-color 0.15s ease;
+  }
+  .chip[aria-pressed="true"]{
+    border:2px solid var(--primary-focus);
+    font-weight:600;
+  }
+  .chip:focus-visible{ outline:2px solid var(--primary-focus); outline-offset:2px; }
+
+  .btn-primary{
+    appearance:none;
+    border:none;
+    cursor:pointer;
+    background:var(--primary);
+    color:var(--on-primary);
+    font-family:"SF Pro Text",-apple-system,system-ui,sans-serif;
+    font-size:17px;
+    font-weight:400;
+    letter-spacing:-0.374px;
+    line-height:1.47;
+    border-radius:9999px;
+    padding:11px 28px;
+    transition:transform 0.1s ease;
+  }
+  .btn-primary:active{ transform:scale(0.95); }
+  .btn-primary:focus-visible{ outline:2px solid var(--primary-focus); outline-offset:2px; }
+  .btn-primary:disabled{ opacity:0.5; cursor:not-allowed; }
+
+  .results{
+    width:100%;
+    max-width:640px;
+    display:flex;
+    flex-direction:column;
+    gap:24px;
+    margin-top:8px;
+  }
+  .empty-note{
+    font-family:"SF Pro Text",-apple-system,system-ui,sans-serif;
+    font-size:14px;
+    color:var(--body-muted);
+    letter-spacing:-0.224px;
+  }
+
+  .set-row{
+    display:flex;
+    align-items:center;
+    gap:20px;
+    flex-wrap:wrap;
+    justify-content:center;
+  }
+  .set-label{
+    font-family:"SF Pro Text",-apple-system,system-ui,sans-serif;
+    font-size:12px;
+    font-weight:600;
+    letter-spacing:-0.12px;
+    color:var(--body-muted);
+    min-width:28px;
+    text-align:right;
+  }
+  .tray{
+    display:flex;
+    gap:10px;
+    padding-bottom:6px;
+  }
+  .ball{
+    width:46px;
+    height:46px;
+    border-radius:9999px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-family:"SF Pro Text",-apple-system,system-ui,sans-serif;
+    font-weight:600;
+    font-size:16px;
+    font-variant-numeric:tabular-nums;
+    color:#ffffff;
+    box-shadow:var(--product-shadow);
+    opacity:0;
+    transform:translateY(-10px);
+    animation:appear 0.35s ease forwards;
+    animation-delay:var(--delay,0s);
+  }
+  @keyframes appear{ to{ opacity:1; transform:translateY(0); } }
+  @media (prefers-reduced-motion:reduce){
+    .ball{ animation:none; opacity:1; transform:none; }
+  }
+
+  .b-yellow{ background:var(--ball-yellow); color:#3d2f00; }
+  .b-blue{ background:var(--ball-blue); }
+  .b-red{ background:var(--ball-red); }
+  .b-gray{ background:var(--ball-gray); color:#1d1d1f; }
+  .b-green{ background:var(--ball-green); }
+
+  .legend{
+    display:flex;
+    gap:20px;
+    flex-wrap:wrap;
+    justify-content:center;
+    margin-top:8px;
+  }
+  .legend span{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    font-family:"SF Pro Text",-apple-system,system-ui,sans-serif;
+    font-size:12px;
+    font-weight:400;
+    letter-spacing:-0.12px;
+    color:var(--body-muted);
+  }
+  .dot{ width:9px; height:9px; border-radius:50%; display:inline-block; }
+
+  .footer{
+    background:var(--canvas-parchment);
+    padding:64px 24px;
+    text-align:center;
+    font-family:"SF Pro Text",-apple-system,system-ui,sans-serif;
+    font-size:12px;
+    font-weight:400;
+    letter-spacing:-0.12px;
+    line-height:1.43;
+    color:var(--ink-muted-48);
+  }
+
+  @media (max-width:640px){
+    .tile{ padding:48px 20px; }
+    .footer{ padding:48px 20px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="nav">LOTTO 6/45</div>
+
+<section class="tile tile-light">
+  <p class="eyebrow">LOTTO 6/45</p>
+  <h1>로또 번호 추첨기</h1>
+  <p class="lead">1부터 45 사이에서 중복 없는 번호 6개를 무작위로 뽑습니다.</p>
+
+  <div class="chip-group" id="countGroup" role="group" aria-label="게임 수 선택">
+    <button class="chip" data-count="1" aria-pressed="true">1게임</button>
+    <button class="chip" data-count="2" aria-pressed="false">2게임</button>
+    <button class="chip" data-count="3" aria-pressed="false">3게임</button>
+    <button class="chip" data-count="4" aria-pressed="false">4게임</button>
+    <button class="chip" data-count="5" aria-pressed="false">5게임</button>
+  </div>
+
+  <button class="btn-primary" id="drawBtn">번호 추첨하기</button>
+</section>
+
+<section class="tile tile-dark">
+  <p class="eyebrow">RESULT</p>
+  <h2>추첨 결과</h2>
+  <p class="lead">공을 누르지 않아도 자동으로 정렬되어 나타납니다.</p>
+
+  <div class="results" id="results">
+    <p class="empty-note">위에서 추첨하기를 누르면 결과가 여기에 표시됩니다</p>
+  </div>
+
+  <div class="legend">
+    <span><i class="dot" style="background:var(--ball-yellow)"></i>1–10</span>
+    <span><i class="dot" style="background:var(--ball-blue)"></i>11–20</span>
+    <span><i class="dot" style="background:var(--ball-red)"></i>21–30</span>
+    <span><i class="dot" style="background:var(--ball-gray)"></i>31–40</span>
+    <span><i class="dot" style="background:var(--ball-green)"></i>41–45</span>
+  </div>
+</section>
+
+<div class="footer">실제 로또 추첨과는 무관한 무작위 생성 도구입니다 · 참고용으로만 사용하세요</div>
+
+<script>
+(function(){
+  let count = 1;
+
+  const countGroup = document.getElementById('countGroup');
+  countGroup.addEventListener('click', function(e){
+    const btn = e.target.closest('.chip');
+    if(!btn) return;
+    countGroup.querySelectorAll('.chip').forEach(c=>c.setAttribute('aria-pressed','false'));
+    btn.setAttribute('aria-pressed','true');
+    count = parseInt(btn.dataset.count, 10);
+  });
+
+  function colorClass(n){
+    if(n<=10) return 'b-yellow';
+    if(n<=20) return 'b-blue';
+    if(n<=30) return 'b-red';
+    if(n<=40) return 'b-gray';
+    return 'b-green';
+  }
+
+  function drawOne(){
+    const nums = new Set();
+    while(nums.size < 6){
+      nums.add(1 + Math.floor(Math.random()*45));
+    }
+    return Array.from(nums).sort((a,b)=>a-b);
+  }
+
+  function render(sets){
+    const wrap = document.getElementById('results');
+    wrap.innerHTML = '';
+    sets.forEach((nums, setIdx)=>{
+      const row = document.createElement('div');
+      row.className = 'set-row';
+
+      const label = document.createElement('span');
+      label.className = 'set-label';
+      label.textContent = 'A' + (setIdx+1);
+      row.appendChild(label);
+
+      const tray = document.createElement('div');
+      tray.className = 'tray';
+
+      nums.forEach((n, i)=>{
+        const b = document.createElement('div');
+        b.className = 'ball ' + colorClass(n);
+        b.textContent = n;
+        b.style.setProperty('--delay', ((setIdx*6+i)*0.04) + 's');
+        tray.appendChild(b);
+      });
+
+      row.appendChild(tray);
+      wrap.appendChild(row);
+    });
+  }
+
+  const btn = document.getElementById('drawBtn');
+  btn.addEventListener('click', function(){
+    btn.disabled = true;
+    const sets = [];
+    for(let i=0;i<count;i++) sets.push(drawOne());
+    render(sets);
+    setTimeout(()=>{ btn.disabled = false; }, 350);
+  });
+})();
+</script>
+</body>
+</html>

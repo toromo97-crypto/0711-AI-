@@ -1,21 +1,23 @@
 const MODEL = 'gpt-5.4-mini';
+const GENDER_LABEL = { male: '남성', female: '여성' };
 
-function buildMessages(birthDate, birthTime) {
+function buildMessages(birthDate, birthTime, gender) {
   const timeLine = birthTime
     ? `태어난 시간: ${birthTime}`
     : '태어난 시간: 알려지지 않음 (시간 정보 없이 분석)';
 
   const system = [
     '너는 한국 전통 사주(四柱) 명리학을 참고해 로또 6/45 번호를 추천하는 오락용 어시스턴트다.',
-    '실제 명리학적 정확성을 보장하지 않는 재미용 콘텐츠임을 감안하고, 생년월일(과 가능하면 태어난 시간)에서 연상되는 오행(五行)·간지 이미지를 근거로 1~45 사이의 서로 다른 정수 6개를 골라라.',
+    '실제 명리학적 정확성을 보장하지 않는 재미용 콘텐츠임을 감안하고, 생년월일·태어난 시간·성별에서 연상되는 오행(五行)·간지 이미지를 근거로 1~45 사이의 서로 다른 정수 6개를 골라라.',
     '반드시 아래 JSON 형식으로만 답하고, 다른 텍스트나 마크다운은 절대 포함하지 마라.',
-    '{"numbers":[1~45 사이 중복 없는 정수 6개, 오름차순],"reason":"사주 해석에 기반한 한국어 추천 이유. 2~3문장, 존댓말"}',
+    '{"numbers":[1~45 사이 중복 없는 정수 6개, 오름차순],"reason":"사주 풀이에 기반한 한국어 추천 이유. 3~4문장, 존댓말"}',
   ].join('\n');
 
   const user = [
     `생년월일: ${birthDate}`,
     timeLine,
-    '위 정보를 바탕으로 사주 기반 로또 번호 6개와 추천 이유를 JSON으로 알려줘.',
+    `성별: ${GENDER_LABEL[gender] || '미상'}`,
+    '위 정보를 바탕으로 사주 풀이와 로또 번호 6개를 JSON으로 알려줘.',
   ].join('\n');
 
   return [
@@ -63,13 +65,43 @@ async function callOpenAI(apiKey, messages) {
   return data;
 }
 
+async function saveDraw({ birthDate, birthTime, gender, reason, numbers }) {
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return; // Supabase not configured — skip storage, don't block the user.
+
+  try {
+    const r = await fetch(`${url}/rest/v1/saju_draws`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: key,
+        Authorization: `Bearer ${key}`,
+        Prefer: 'return=minimal',
+      },
+      body: JSON.stringify([{
+        birth_date: birthDate,
+        birth_time: birthTime || null,
+        gender,
+        reason,
+        numbers,
+      }]),
+    });
+    if (!r.ok) {
+      console.error('Supabase insert failed:', r.status, await r.text());
+    }
+  } catch (e) {
+    console.error('Supabase insert error:', e.message);
+  }
+}
+
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') {
     res.status(405).json({ error: '허용되지 않은 요청 방식입니다.' });
     return;
   }
 
-  const { birthDate, birthTime } = req.body || {};
+  const { birthDate, birthTime, gender } = req.body || {};
 
   if (!birthDate || !/^\d{4}-\d{2}-\d{2}$/.test(birthDate)) {
     res.status(400).json({ error: '생년월일을 YYYY-MM-DD 형식으로 입력해주세요.' });
@@ -77,6 +109,10 @@ module.exports = async function handler(req, res) {
   }
   if (birthTime && !/^\d{2}:\d{2}$/.test(birthTime)) {
     res.status(400).json({ error: '태어난 시간 형식이 올바르지 않습니다.' });
+    return;
+  }
+  if (gender !== 'male' && gender !== 'female') {
+    res.status(400).json({ error: '성별을 선택해주세요.' });
     return;
   }
 
@@ -87,7 +123,7 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    const messages = buildMessages(birthDate, birthTime || null);
+    const messages = buildMessages(birthDate, birthTime || null, gender);
     const completion = await callOpenAI(apiKey, messages);
     const content = completion?.choices?.[0]?.message?.content || '{}';
 
@@ -102,6 +138,8 @@ module.exports = async function handler(req, res) {
     const reason = typeof parsed.reason === 'string' && parsed.reason.trim()
       ? parsed.reason.trim()
       : '입력하신 생년월일을 바탕으로 오행의 기운이 조화를 이루는 번호를 골라봤어요.';
+
+    await saveDraw({ birthDate, birthTime: birthTime || null, gender, reason, numbers });
 
     res.status(200).json({ numbers, reason });
   } catch (e) {

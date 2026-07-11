@@ -304,6 +304,20 @@
   .field input:disabled{ color:var(--ink-muted-48); background:var(--canvas-parchment); }
   .field input:focus-visible{ outline:2px solid var(--primary-focus); outline-offset:2px; }
 
+  .field select{
+    appearance:none;
+    border:1px solid var(--hairline);
+    background:var(--canvas);
+    color:var(--ink);
+    font-family:"SF Pro Text",-apple-system,system-ui,sans-serif;
+    font-size:17px;
+    letter-spacing:-0.374px;
+    border-radius:9999px;
+    padding:12px 20px;
+    height:44px;
+  }
+  .field select:focus-visible{ outline:2px solid var(--primary-focus); outline-offset:2px; }
+
   .checkbox-row{
     display:flex;
     align-items:center;
@@ -382,6 +396,17 @@
       <label class="field">
         <span class="field-label">태어난 시간</span>
         <input type="time" id="birthTime" disabled>
+      </label>
+    </div>
+
+    <div class="field-row">
+      <label class="field">
+        <span class="field-label">성별</span>
+        <select id="gender" required>
+          <option value="" disabled selected>선택해주세요</option>
+          <option value="male">남성</option>
+          <option value="female">여성</option>
+        </select>
       </label>
     </div>
 
@@ -517,9 +542,14 @@
 
     const birthDate = document.getElementById('birthDate').value;
     const birthTime = timeUnknown.checked ? '' : birthTimeInput.value;
+    const gender = document.getElementById('gender').value;
 
     if(!birthDate){
       sajuError.textContent = '생년월일을 입력해주세요.';
+      return;
+    }
+    if(!gender){
+      sajuError.textContent = '성별을 선택해주세요.';
       return;
     }
 
@@ -530,7 +560,7 @@
       const res = await fetch('/api/saju', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ birthDate, birthTime: birthTime || null })
+        body: JSON.stringify({ birthDate, birthTime: birthTime || null, gender })
       });
       const data = await res.json();
 
